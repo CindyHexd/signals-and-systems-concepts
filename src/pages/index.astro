@@ -1,0 +1,127 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { concepts } from "../data/concepts";
+
+const base = import.meta.env.BASE_URL;
+const portfolio = "https://cindyhexd.github.io/projects-and-notes/";
+---
+
+<BaseLayout
+  title="Signals and Systems concepts"
+  description="Clickable glossary of signals and systems ideas — math, Chinglish, and graphic views."
+  bodyClass="ss-body"
+  faviconEmoji="〰️"
+>
+  <div class="page">
+    <a class="back" href={portfolio}>← Projects and notes</a>
+
+    <header class="hero">
+      <h1>Signals and Systems concepts</h1>
+      <p class="lede">
+        Signals and systems course concepts presented in the same order as in university course, with each concept presented in multiple ways (mathematical definition, graphic, Chinglish).
+      </p>
+      <p class="count">{concepts.length} concepts</p>
+    </header>
+
+    <ul class="concept-list">
+      {
+        concepts.map((c) => (
+          <li>
+            <a class="concept" href={`${base}${c.slug}/`}>
+              <span class="concept-name">{c.title}</span>
+              {c.blurb ? <span class="concept-blurb">{c.blurb}</span> : null}
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+  </div>
+</BaseLayout>
+
+<style is:global>
+  body.ss-body.shell-neutral {
+    background: linear-gradient(180deg, #fafafa 0%, #f4f4f5 55%, #ecfdf5 100%);
+  }
+</style>
+
+<style>
+  .page {
+    max-width: 40rem;
+    margin: 0 auto;
+    padding: 1.25rem 1.25rem 3.5rem;
+    color: #18181b;
+  }
+  .back {
+    display: inline-block;
+    margin-bottom: 1.75rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #71717a;
+    text-decoration: none;
+  }
+  .back:hover {
+    color: #18181b;
+  }
+  .hero {
+    margin-bottom: 2rem;
+  }
+  h1 {
+    margin: 0 0 0.75rem;
+    font-size: clamp(1.5rem, 3.5vw, 1.875rem);
+    font-weight: 600;
+    letter-spacing: -0.03em;
+    line-height: 1.2;
+  }
+  .lede {
+    margin: 0 0 0.75rem;
+    font-size: 0.9875rem;
+    line-height: 1.6;
+    color: #52525b;
+  }
+  .count {
+    margin: 0;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: #a1a1aa;
+    letter-spacing: 0.02em;
+  }
+  .concept-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .concept {
+    display: block;
+    padding: 1.1rem 0.75rem;
+    margin: 0 -0.75rem;
+    border-top: 1px solid #e4e4e7;
+    border-radius: 0.25rem;
+    text-decoration: none;
+    color: inherit;
+    transition: background-color 0.15s ease;
+  }
+  .concept-list li:last-child .concept {
+    border-bottom: 1px solid #e4e4e7;
+  }
+  .concept:hover {
+    background-color: rgba(255, 255, 255, 0.72);
+  }
+  .concept:focus-visible {
+    outline: 2px solid #18181b;
+    outline-offset: 2px;
+  }
+  .concept-name {
+    display: block;
+    font-size: 1.0625rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: #18181b;
+  }
+  .concept-blurb {
+    display: block;
+    margin-top: 0.3rem;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    color: #71717a;
+  }
+</style>

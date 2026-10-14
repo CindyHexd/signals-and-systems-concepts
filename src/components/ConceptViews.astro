@@ -1,0 +1,392 @@
+---
+interface ConceptViewProp {
+  id: string;
+  label: string;
+  body: string;
+}
+
+interface Props {
+  views: ConceptViewProp[];
+}
+
+const { views } = Astro.props;
+
+const SHORT_LABELS: Record<string, string> = {
+  math: "Math",
+  chinglish: "Chinglish",
+  graphic: "Graphic",
+};
+
+const KATEX_CSS = "https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.css";
+const KATEX_JS = "https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.js";
+const KATEX_AUTO =
+  "https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/contrib/auto-render.min.js";
+---
+
+<link rel="stylesheet" href={KATEX_CSS} />
+<script src={KATEX_JS} is:inline></script>
+<script src={KATEX_AUTO} is:inline></script>
+
+<div class="views" data-views>
+  <div class="tabs" role="tablist" aria-label="Ways of understanding">
+    {
+      views.map((view, i) => (
+        <button
+          type="button"
+          class:list={["tab", { active: i === 0 }]}
+          role="tab"
+          id={`tab-${view.id}`}
+          aria-label={view.label}
+          title={view.label}
+          aria-selected={i === 0 ? "true" : "false"}
+          aria-controls={`panel-${view.id}`}
+          data-view={view.id}
+          tabindex={i === 0 ? 0 : -1}
+        >
+          {SHORT_LABELS[view.id] ?? view.label}
+        </button>
+      ))
+    }
+  </div>
+
+  {
+    views.map((view, i) => (
+      <section
+        class:list={["panel", { active: i === 0 }]}
+        role="tabpanel"
+        id={`panel-${view.id}`}
+        aria-labelledby={`tab-${view.id}`}
+        data-panel={view.id}
+        hidden={i !== 0}
+      >
+        <h2 class="panel-title">{view.label}</h2>
+        {view.id === "math" ? (
+          <div class="math-block" data-math-block data-mode="display">
+            <div class="math-display" data-math-display>{view.body}</div>
+            <pre class="latex-pre" data-math-source hidden><code data-latex-source>{view.body}</code></pre>
+            <div class="math-toolbar">
+              <div class="mode-toggle" role="group" aria-label="Math view mode">
+                <button
+                  type="button"
+                  class="mode-btn active"
+                  data-mode-btn="display"
+                  aria-pressed="true"
+                >
+                  Display
+                </button>
+                <button
+                  type="button"
+                  class="mode-btn"
+                  data-mode-btn="source"
+                  aria-pressed="false"
+                >
+                  LaTeX
+                </button>
+              </div>
+              <button type="button" class="copy-btn" data-copy>
+                Copy LaTeX
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div class="panel-body">{view.body}</div>
+        )}
+      </section>
+    ))
+  }
+</div>
+
+<script>
+  declare global {
+    interface Window {
+      renderMathInElement?: (
+        el: HTMLElement,
+        options: {
+          delimiters: { left: string; right: string; display: boolean }[];
+          throwOnError: boolean;
+        },
+      ) => void;
+    }
+  }
+
+  const root = document.querySelector("[data-views]");
+  if (root) {
+    const tabs = [...root.querySelectorAll<HTMLButtonElement>("[data-view]")];
+    const panels = [...root.querySelectorAll<HTMLElement>("[data-panel]")];
+
+    function select(id: string) {
+      for (const tab of tabs) {
+        const on = tab.dataset.view === id;
+        tab.classList.toggle("active", on);
+        tab.setAttribute("aria-selected", on ? "true" : "false");
+        tab.tabIndex = on ? 0 : -1;
+      }
+      for (const panel of panels) {
+        const on = panel.dataset.panel === id;
+        panel.classList.toggle("active", on);
+        panel.hidden = !on;
+      }
+    }
+
+    for (const tab of tabs) {
+      tab.addEventListener("click", () => {
+        const id = tab.dataset.view;
+        if (id) select(id);
+      });
+    }
+
+    root.querySelector(".tabs")?.addEventListener("keydown", (e) => {
+      const keys = ["ArrowLeft", "ArrowRight", "Home", "End"];
+      if (!(e instanceof KeyboardEvent) || !keys.includes(e.key)) return;
+      const current = tabs.findIndex((t) => t.getAttribute("aria-selected") === "true");
+      if (current < 0) return;
+      e.preventDefault();
+      let next = current;
+      if (e.key === "ArrowRight") next = (current + 1) % tabs.length;
+      if (e.key === "ArrowLeft") next = (current - 1 + tabs.length) % tabs.length;
+      if (e.key === "Home") next = 0;
+      if (e.key === "End") next = tabs.length - 1;
+      const id = tabs[next]?.dataset.view;
+      if (id) {
+        select(id);
+        tabs[next]?.focus();
+      }
+    });
+
+    function renderDisplay(block: Element) {
+      const display = block.querySelector<HTMLElement>("[data-math-display]");
+      if (!display || !window.renderMathInElement) return;
+      if (display.dataset.rendered === "true") return;
+      window.renderMathInElement(display, {
+        delimiters: [
+          { left: "\\[", right: "\\]", display: true },
+          { left: "$$", right: "$$", display: true },
+          { left: "\\(", right: "\\)", display: false },
+          { left: "$", right: "$", display: false },
+        ],
+        throwOnError: false,
+      });
+      display.dataset.rendered = "true";
+    }
+
+    function setMode(block: HTMLElement, mode: "display" | "source") {
+      block.dataset.mode = mode;
+      const display = block.querySelector<HTMLElement>("[data-math-display]");
+      const source = block.querySelector<HTMLElement>("[data-math-source]");
+      if (display) display.hidden = mode !== "display";
+      if (source) source.hidden = mode !== "source";
+      for (const btn of block.querySelectorAll<HTMLButtonElement>("[data-mode-btn]")) {
+        const on = btn.dataset.modeBtn === mode;
+        btn.classList.toggle("active", on);
+        btn.setAttribute("aria-pressed", on ? "true" : "false");
+      }
+      if (mode === "display") renderDisplay(block);
+    }
+
+    function initMathBlocks() {
+      for (const block of root.querySelectorAll<HTMLElement>("[data-math-block]")) {
+        setMode(block, "display");
+
+        for (const btn of block.querySelectorAll<HTMLButtonElement>("[data-mode-btn]")) {
+          btn.addEventListener("click", () => {
+            const mode = btn.dataset.modeBtn === "source" ? "source" : "display";
+            setMode(block, mode);
+          });
+        }
+
+        const copyBtn = block.querySelector<HTMLButtonElement>("[data-copy]");
+        const sourceEl = block.querySelector("[data-latex-source]");
+        if (copyBtn && sourceEl) {
+          copyBtn.addEventListener("click", async () => {
+            const text = sourceEl.textContent ?? "";
+            try {
+              await navigator.clipboard.writeText(text);
+              copyBtn.textContent = "Copied";
+              window.setTimeout(() => {
+                copyBtn.textContent = "Copy LaTeX";
+              }, 1500);
+            } catch {
+              copyBtn.textContent = "Failed";
+              window.setTimeout(() => {
+                copyBtn.textContent = "Copy LaTeX";
+              }, 1500);
+            }
+          });
+        }
+      }
+    }
+
+    function waitForKatex(): Promise<void> {
+      if (window.renderMathInElement) return Promise.resolve();
+      return new Promise((resolve) => {
+        const start = Date.now();
+        const timer = window.setInterval(() => {
+          if (window.renderMathInElement || Date.now() - start > 5000) {
+            window.clearInterval(timer);
+            resolve();
+          }
+        }, 30);
+      });
+    }
+
+    waitForKatex().then(initMathBlocks);
+  }
+</script>
+
+<style>
+  .tabs {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 0.35rem;
+    margin-bottom: 1.25rem;
+    padding: 0.25rem;
+    background: rgba(255, 255, 255, 0.7);
+    border: 1px solid #e4e4e7;
+    border-radius: 0.5rem;
+  }
+  .tab {
+    appearance: none;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: #71717a;
+    padding: 0.45rem 0.7rem;
+    border-radius: 0.35rem;
+    line-height: 1.3;
+    white-space: nowrap;
+    flex: 1 1 0;
+    text-align: center;
+  }
+  .tab:hover {
+    color: #18181b;
+    background: #f4f4f5;
+  }
+  .tab.active {
+    color: #18181b;
+    background: #fff;
+    box-shadow: 0 0 0 1px #e4e4e7;
+  }
+  .tab:focus-visible {
+    outline: 2px solid #18181b;
+    outline-offset: 1px;
+  }
+  .panel {
+    display: none;
+  }
+  .panel.active {
+    display: block;
+  }
+  .panel-title {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  .panel-body {
+    white-space: pre-line;
+    font-size: 1rem;
+    line-height: 1.7;
+    color: #3f3f46;
+  }
+  .math-block {
+    border: 1px solid #e4e4e7;
+    border-radius: 0.5rem;
+    background: #fff;
+    overflow: hidden;
+  }
+  .math-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    padding: 0.45rem 0.65rem;
+    background: #f4f4f5;
+    border-top: 1px solid #e4e4e7;
+  }
+  .mode-toggle {
+    display: inline-flex;
+    gap: 0.2rem;
+    padding: 0.15rem;
+    background: #e4e4e7;
+    border-radius: 0.35rem;
+  }
+  .mode-btn {
+    appearance: none;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: #71717a;
+    padding: 0.28rem 0.55rem;
+    border-radius: 0.25rem;
+  }
+  .mode-btn:hover {
+    color: #18181b;
+  }
+  .mode-btn.active {
+    background: #fff;
+    color: #18181b;
+    box-shadow: 0 0 0 1px #d4d4d8;
+  }
+  .mode-btn:focus-visible {
+    outline: 2px solid #18181b;
+    outline-offset: 1px;
+  }
+  .copy-btn {
+    appearance: none;
+    border: 1px solid #d4d4d8;
+    background: #fff;
+    color: #3f3f46;
+    font: inherit;
+    font-size: 0.75rem;
+    font-weight: 500;
+    padding: 0.28rem 0.55rem;
+    border-radius: 0.3rem;
+    cursor: pointer;
+  }
+  .copy-btn:hover {
+    background: #fafafa;
+    color: #18181b;
+  }
+  .copy-btn:focus-visible {
+    outline: 2px solid #18181b;
+    outline-offset: 1px;
+  }
+  .math-display {
+    padding: 1rem 1rem 1.15rem;
+    font-size: 1rem;
+    line-height: 1.75;
+    color: #27272a;
+    white-space: pre-line;
+    overflow-x: auto;
+  }
+  .math-display :global(.katex-display) {
+    margin: 0.85em 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+  .latex-pre {
+    margin: 0;
+    padding: 1rem 0.9rem 1.1rem;
+    overflow-x: auto;
+    background: #18181b;
+  }
+  .latex-pre code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.8125rem;
+    line-height: 1.65;
+    color: #e4e4e7;
+    white-space: pre;
+  }
+</style>
